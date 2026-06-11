@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net9.0</TargetFrameworks>
+    <RootNamespace>FollowCode.SDK</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>FollowCode.SDK</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>FollowCode</Authors>
+    <Description>Track C# objects in real-time with WeakReference for automatic cleanup. Single API: Track().</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>realtime tracking weakreference followcode</PackageTags>
+    <PackageOutputPath>..\nupkg\</PackageOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="System.Net.Http.Json" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FollowCode.Tests" />
+  </ItemGroup>
+
+</Project>
