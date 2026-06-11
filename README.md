@@ -67,25 +67,40 @@ cpu = null;
 
 ## How It Works
 
-```
-your C# app                    SDK                         Dashboard (exe)
-    │                          │                              │
-    ├─ Track("key", obj) ──────┤                              │
-    │                          ├─ WeakReference(obj)          │
-    │                          ├─ POST /api/objects ──────────┤
-    │                          │                              ├─ update Text widget
-    │                          │                              │
-    │                          │  obj = null                  │
-    │                          │                              │
-    │                          │  ├─ Timer: GC.Collect()      │
-    │                          │  ├─ IsAlive == false → remove│
-    │                          │  ├─ POST (without dead obj) ─┤
-    │                          │                              ├─ remove row
+### Track Flow
+
+```mermaid
+sequenceDiagram
+    participant App as Your C# App
+    participant SDK as FollowCode SDK
+    participant Flask as Flask Server
+    participant GUI as Tkinter GUI
+
+    App->>SDK: Track("key", obj)
+    SDK->>SDK: WeakReference(obj)
+    SDK->>Flask: POST /api/objects
+    Flask->>GUI: push to queue
+    GUI->>GUI: render Text widget
 ```
 
-- **`Track(key, data)`**: stores object as WeakReference, sends immediately
-- **Timer**: runs every N seconds, calls `GC.Collect()` then checks which WeakReferences are dead
-- **Dashboard**: Flask receives JSON array, Tkinter Text widget renders each object with multi-line support
+### Auto Cleanup Flow
+
+```mermaid
+sequenceDiagram
+    participant App as Your C# App
+    participant SDK as FollowCode SDK
+    participant GC as .NET GC
+    participant Flask as Flask Server
+    participant GUI as Tkinter GUI
+
+    App->>App: obj = null
+    SDK->>GC: Timer: GC.Collect()
+    GC-->>SDK: obj collected
+    SDK->>SDK: IsAlive == false → remove
+    SDK->>Flask: POST (without dead obj)
+    Flask->>GUI: push to queue
+    GUI->>GUI: remove row
+```
 
 ### Auto Format
 
