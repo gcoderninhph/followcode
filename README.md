@@ -153,13 +153,46 @@ public class FollowCodeConfig
 
 ---
 
+## Unity Usage
+
+The SDK auto-detects Unity via `#if UNITY_ENGINE` and switches to Unity-compatible APIs:
+
+| Feature | .NET | Unity |
+|---|---|---|
+| HTTP | `HttpClient.PostAsJsonAsync` | `UnityWebRequest` |
+| Timer | `System.Timers.Timer` | `Task.Delay` loop |
+| JSON | `System.Text.Json` (built-in) | `Newtonsoft.Json` |
+
+**Setup in Unity:**
+
+1. Copy `FollowCode.SDK.dll` into `Assets/Plugins/`
+2. Add [Newtonsoft.Json](https://github.com/jilleJr/Newtonsoft.Json-for-Unity) package
+3. Use exactly the same API:
+
+```csharp
+using FollowCode.SDK;
+
+var client = new FollowCodeClient(new FollowCodeConfig
+{
+    ServerUrl = "http://localhost:42102",
+    IntervalSeconds = 1
+});
+
+client.Track("player", playerStats);
+```
+
+> No `MonoBehaviour` required. The SDK runs on a background task.
+
+---
+
 ## Requirements
 
 | Component | Requires |
 |---|---|
 | **Dashboard (exe)** | Windows 10+, nothing else |
 | **Dashboard (source)** | Python 3.12+, Flask, Tkinter |
-| **SDK** | .NET Standard 2.0+ / .NET 9.0 |
+| **SDK (.NET)** | .NET Standard 2.0+ / .NET 9.0 |
+| **SDK (Unity)** | Unity 2020.3+, Newtonsoft.Json |
 
 ---
 

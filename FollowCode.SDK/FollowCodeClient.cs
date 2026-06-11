@@ -1,7 +1,13 @@
-using System.Net.Http.Json;
-using System.Timers;
 using System.Net.Http;
 using System.Collections;
+
+#if UNITY_ENGINE
+using UnityEngine.Networking;
+using Newtonsoft.Json;
+#else
+using System.Net.Http.Json;
+using System.Timers;
+#endif
 
 namespace FollowCode.SDK;
 
@@ -9,32 +15,51 @@ public class FollowCodeClient : IDisposable
 {
     private readonly HttpClient _httpClient;
     private readonly Dictionary<string, TrackedObject> _objects = new();
+    private readonly int _intervalMs;
+    private readonly string _serverUrl;
+
+#if UNITY_ENGINE
+    private CancellationTokenSource? _cts;
+#else
     private readonly System.Timers.Timer _timer;
+#endif
 
     public FollowCodeClient(FollowCodeConfig config)
     {
         if (config is null) throw new ArgumentNullException(nameof(config));
+        _serverUrl = config.ServerUrl;
+        _intervalMs = config.IntervalSeconds * 1000;
 
         _httpClient = new HttpClient { BaseAddress = new Uri(config.ServerUrl) };
         _httpClient.Timeout = TimeSpan.FromSeconds(config.TimeoutSeconds);
         _httpClient.DefaultRequestHeaders.Add("User-Agent", "FollowCode-SDK/1.0");
 
-        _timer = new System.Timers.Timer(config.IntervalSeconds * 1000);
+#if UNITY_ENGINE
+        _cts = new CancellationTokenSource();
+        _ = TimerLoop(_cts.Token);
+#else
+        _timer = new System.Timers.Timer(_intervalMs);
         _timer.Elapsed += OnTimerElapsed;
         _timer.AutoReset = true;
         _timer.Start();
+#endif
     }
 
+#if !UNITY_ENGINE
     internal FollowCodeClient(FollowCodeConfig config, HttpMessageHandler handler)
     {
+        _serverUrl = config.ServerUrl;
+        _intervalMs = config.IntervalSeconds * 1000;
+
         _httpClient = new HttpClient(handler) { BaseAddress = new Uri(config.ServerUrl) };
         _httpClient.Timeout = TimeSpan.FromSeconds(config.TimeoutSeconds);
 
-        _timer = new System.Timers.Timer(config.IntervalSeconds * 1000);
+        _timer = new System.Timers.Timer(_intervalMs);
         _timer.Elapsed += OnTimerElapsed;
         _timer.AutoReset = true;
         _timer.Start();
     }
+#endif
 
     public void Track(string key, object data)
     {
@@ -48,11 +73,27 @@ public class FollowCodeClient : IDisposable
         _ = SendObjectsAsync();
     }
 
+#if UNITY_ENGINE
+    private async Task TimerLoop(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try { await Task.Delay(_intervalMs, ct); }
+            catch { break; }
+
+            if (ct.IsCancellationRequested) break;
+
+            GC.Collect();
+            await SendObjectsAsync();
+        }
+    }
+#else
     private async void OnTimerElapsed(object? sender, ElapsedEventArgs e)
     {
         GC.Collect();
         await SendObjectsAsync();
     }
+#endif
 
     private async Task SendObjectsAsync()
     {
@@ -60,7 +101,22 @@ public class FollowCodeClient : IDisposable
         {
             CleanDeadObjects();
             var payload = BuildPayload();
+
+#if UNITY_ENGINE
+            var json = JsonConvert.SerializeObject(payload);
+            var url = _serverUrl.TrimEnd('/') + "/api/objects";
+            using var req = UnityWebRequest.Put(url, json);
+            req.method = "POST";
+            req.SetRequestHeader("Content-Type", "application/json");
+
+            var op = req.SendWebRequest();
+            while (!op.isDone) await Task.Yield();
+
+            if (req.result != UnityWebRequest.Result.Success)
+                Console.WriteLine($"[SDK] Send failed: {req.error}");
+#else
             await _httpClient.PostAsJsonAsync("/api/objects", payload);
+#endif
         }
         catch { }
     }
@@ -127,7 +183,12 @@ public class FollowCodeClient : IDisposable
 
     public void Dispose()
     {
+#if UNITY_ENGINE
+        _cts?.Cancel();
+        _cts?.Dispose();
+#else
         _timer?.Dispose();
+#endif
         _objects.Clear();
         _httpClient?.Dispose();
         GC.SuppressFinalize(this);
