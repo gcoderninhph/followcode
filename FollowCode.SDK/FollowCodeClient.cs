@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Timers;
 using System.Net.Http;
+using System.Collections;
 
 namespace FollowCode.SDK;
 
@@ -90,12 +91,38 @@ public class FollowCodeClient : IDisposable
                 payload.Add(new
                 {
                     key = kvp.Key,
-                    data = data?.ToString() ?? "null",
+                    data = FormatData(data),
                     updatedAt = kvp.Value.UpdatedAt
                 });
             }
         }
         return payload;
+    }
+
+    private static string FormatData(object? data)
+    {
+        if (data is null) return "null";
+
+        if (data is IDictionary dict)
+        {
+            var entries = new List<string>();
+            foreach (DictionaryEntry entry in dict)
+                entries.Add($"{entry.Key}: {entry.Value}");
+            return "{ " + string.Join(", ", entries) + " }";
+        }
+
+        if (data is string str)
+            return str;
+
+        if (data is IEnumerable enumerable)
+        {
+            var items = new List<string>();
+            foreach (var item in enumerable)
+                items.Add(item?.ToString() ?? "null");
+            return "[ " + string.Join(", ", items) + " ]";
+        }
+
+        return data.ToString() ?? "null";
     }
 
     public void Dispose()

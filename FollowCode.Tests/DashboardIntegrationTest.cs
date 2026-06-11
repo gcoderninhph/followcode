@@ -7,7 +7,9 @@ public class DashboardIntegrationTest
 {
     private MyObj? cpu = new MyObj { Name = "CPU", Value = 45 };
     private MyObj? mem = new MyObj { Name = "Memory", Value = 72 };
-    private MyObj? dick = new MyObj { Name = "Dick", Value = 000 };
+    private MyObj? dick = new MyObj { Name = "Dick", Value = 0 };
+
+    private Dictionary<string, MyObj> a = new();
 
     [Fact]
     public async Task Track_WeakReference_AutoCleanup_WhenObjectGoesOutOfScope()
@@ -24,38 +26,23 @@ public class DashboardIntegrationTest
             IntervalSeconds = 1
         });
 
-        // ---- Phase 1: Track objects in THIS method scope ----
-        // These objects are alive as long as we hold references.
-
-
-        client.Track("srv-cpu", cpu!);
-        client.Track("srv-mem", mem!);
-
-        // --> phải hiển thị lên app python
-        await Task.Delay(2000);
-        cpu!.Value = 90;
-        mem!.Value = 33;
+        // ---- Phase 1: Track dictionary ----
+        client.Track("Dic", a);
         await Task.Delay(2000);
 
-        // --> trên python app thấy được thay đổi dữ liệu
-        ClearObject();
+        a["cpu"] = cpu!;
+        a["mem"] = mem!;
         await Task.Delay(2000);
-        // --> biến mất trên python app
 
-        client.Track("Dick", dick!);
-        // --> hiển thị Dick
-        await Task.Delay(2000); // Give runtime GC time to run naturally
+        // ---- Phase 2: Clear dictionary ----
+        a.Clear();
+        await Task.Delay(2000);
+
+        // ---- Phase 3: Add new entry ----
+        a["dick"] = dick!;
+        await Task.Delay(2000);
         dick!.Value = 10000;
-        // --> python app hiển thị thay đổi của dick
-
         await Task.Delay(10000);
-
-    }
-
-    private void ClearObject()
-    {
-        cpu = null;
-        mem = null;
     }
 
 }
