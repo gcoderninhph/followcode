@@ -107,8 +107,8 @@ public class FollowCodeClient : IDisposable
         {
             var entries = new List<string>();
             foreach (DictionaryEntry entry in dict)
-                entries.Add($"{entry.Key}: {entry.Value}");
-            return "{ " + string.Join(", ", entries) + " }";
+                entries.Add($"  {entry.Key}: {entry.Value}");
+            return dict.Count == 0 ? "{ }" : "{\n" + string.Join("\n", entries) + "\n}";
         }
 
         if (data is string str)
@@ -118,8 +118,8 @@ public class FollowCodeClient : IDisposable
         {
             var items = new List<string>();
             foreach (var item in enumerable)
-                items.Add(item?.ToString() ?? "null");
-            return "[ " + string.Join(", ", items) + " ]";
+                items.Add($"  {item?.ToString() ?? "null"}");
+            return "[\n" + string.Join("\n", items) + "\n]";
         }
 
         return data.ToString() ?? "null";

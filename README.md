@@ -73,19 +73,31 @@ your C# app                    SDK                         Dashboard (exe)
     ├─ Track("key", obj) ──────┤                              │
     │                          ├─ WeakReference(obj)          │
     │                          ├─ POST /api/objects ──────────┤
-    │                          │                              ├─ update Treeview
+    │                          │                              ├─ update Text widget
     │                          │                              │
-    │  obj = null              │                              │
+    │                          │  obj = null                  │
     │                          │                              │
-    │                          ├─ Timer: GC.Collect()         │
-    │                          ├─ IsAlive == false → remove   │
-    │                          ├─ POST (without dead obj) ────┤
+    │                          │  ├─ Timer: GC.Collect()      │
+    │                          │  ├─ IsAlive == false → remove│
+    │                          │  ├─ POST (without dead obj) ─┤
     │                          │                              ├─ remove row
 ```
 
 - **`Track(key, data)`**: stores object as WeakReference, sends immediately
 - **Timer**: runs every N seconds, calls `GC.Collect()` then checks which WeakReferences are dead
-- **Dashboard**: Flask receives JSON array, Tkinter polls and renders Treeview
+- **Dashboard**: Flask receives JSON array, Tkinter Text widget renders each object with multi-line support
+
+### Auto Format
+
+SDK auto-detects data type and formats accordingly:
+
+| Type | Format | Example |
+|---|---|---|
+| `Dictionary` / `Map` | each entry on new line | `{`<br>`  cpu: CPU:90`<br>`  mem: Memory:33`<br>`}` |
+| `List` / `HashSet` / `Queue` | each item on new line | `[`<br>`  CPU:90`<br>`  Memory:33`<br>`]` |
+| `string` | as-is | `hello` |
+| Other objects | `ToString()` | `CPU:90` |
+| `null` | `null` | `null` |
 
 ---
 

@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+from tkinter import font as tkfont
 import json
 
 
@@ -16,21 +17,32 @@ class ObjectDashboard:
         )
         header.pack(fill=tk.X, padx=10, pady=(10, 0))
 
-        # Treeview table
-        columns = ("Key", "Data", "Updated")
-        self.tree = ttk.Treeview(root, columns=columns, show="headings", height=20)
-        self.tree.heading("Key", text="Key")
-        self.tree.heading("Data", text="Data")
-        self.tree.heading("Updated", text="Updated")
-        self.tree.column("Key", width=140, minwidth=100)
-        self.tree.column("Data", width=520, minwidth=200)
-        self.tree.column("Updated", width=260, minwidth=160)
-        self.tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        # Text widget for multi-line display
+        frame = tk.Frame(root)
+        frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+
+        self.text = tk.Text(
+            frame,
+            font=("Consolas", 10),
+            wrap=tk.WORD,
+            state=tk.DISABLED,
+            bg="#1e1e1e",
+            fg="#d4d4d4",
+            insertbackground="white",
+            relief=tk.FLAT,
+            borderwidth=0,
+        )
+        self.text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         # Scrollbar
-        scrollbar = ttk.Scrollbar(root, orient=tk.VERTICAL, command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scrollbar.set)
+        scrollbar = ttk.Scrollbar(frame, orient=tk.VERTICAL, command=self.text.yview)
+        self.text.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Tag for header style (bold, accent color)
+        self.text.tag_configure("header", foreground="#569cd6", font=("Consolas", 10, "bold"))
+        self.text.tag_configure("separator", foreground="#3a3a3a")
+        self.text.tag_configure("empty", foreground="#808080")
 
         # Status bar
         self.status = tk.Label(
@@ -42,62 +54,63 @@ class ObjectDashboard:
         )
         self.status.pack(fill=tk.X, padx=10, pady=(0, 10))
 
-        # Start polling the queue
-        self._object_map = {}
+        self._last_keys = set()
         self._poll_queue()
 
     def _poll_queue(self):
         try:
             while not self.data_queue.empty():
                 objects = self.data_queue.get_nowait()
-                self._update_table(objects)
+                self._render(objects)
         except Exception:
             pass
         self.root.after(200, self._poll_queue)
 
-    def _update_table(self, objects):
+    def _render(self, objects):
         current_keys = set()
 
-        for obj in objects:
+        # Enable writing
+        self.text.configure(state=tk.NORMAL)
+        self.text.delete("1.0", tk.END)
+
+        if not objects:
+            self.text.insert(tk.END, "(no objects tracked)", "empty")
+            self.status.config(text="Cleared - no objects tracked", fg="gray")
+            self.text.configure(state=tk.DISABLED)
+            return
+
+        for i, obj in enumerate(objects):
             key = obj.get("key", "?")
             data_value = obj.get("data", "")
-
-            # Handle both string (ToString) and dict (JSON) data
-            if isinstance(data_value, str):
-                data_str = data_value
-            else:
-                data_str = json.dumps(data_value, ensure_ascii=False)
-
             updated = obj.get("updatedAt", "")
+            current_keys.add(key)
 
-            # Format timestamp for display
+            # Format timestamp
             try:
                 dt = updated.replace("T", " ").replace("Z", "")
                 if "." in dt:
                     dt = dt[: dt.index(".")]
             except Exception:
                 dt = updated
-            current_keys.add(key)
 
-            if key in self._object_map:
-                # Update existing row
-                item_id = self._object_map[key]
-                self.tree.item(item_id, values=(key, data_str, dt))
+            # Handle both string and dict data
+            if isinstance(data_value, str):
+                data_str = data_value
             else:
-                # Insert new row
-                item_id = self.tree.insert("", tk.END, values=(key, data_str, dt))
-                self._object_map[key] = item_id
+                data_str = json.dumps(data_value, ensure_ascii=False, indent=2)
 
-        # Remove objects that are no longer being tracked
-        removed = set(self._object_map.keys()) - current_keys
-        for key in removed:
-            self.tree.delete(self._object_map[key])
-            del self._object_map[key]
+            # Write header
+            self.text.insert(tk.END, f"{key} @ {dt}\n", "header")
+            # Write data content
+            self.text.insert(tk.END, f"{data_str}\n")
+            # Write separator between objects
+            if i < len(objects) - 1:
+                self.text.insert(tk.END, "─" * 80 + "\n", "separator")
+
+        self.text.configure(state=tk.DISABLED)
+        self.text.see("1.0")
 
         count = len(objects)
-        if count > 0:
-            self.status.config(
-                text=f"Last update: {count} object(s) received", fg="green"
-            )
-        else:
-            self.status.config(text="Cleared - no objects tracked", fg="gray")
+        self.status.config(
+            text=f"Last update: {count} object(s)", fg="green"
+        )
